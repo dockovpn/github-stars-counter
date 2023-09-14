@@ -1,33 +1,32 @@
 package io.dockovpn.githubstars
 
-import cats.effect.{IO, IOApp, Temporal}
+import cats.effect.{ExitCode, IO, IOApp, Temporal}
 import cron4s.Cron
 import eu.timepit.fs2cron.cron4s.Cron4sScheduler
 import fs2.Stream
-import fs2.concurrent.SignallingRef
+import io.circe.Json
+import org.http4s.circe.CirceEntityDecoder._
 import org.http4s.client.JavaNetClientBuilder
 
-import scala.concurrent.duration.DurationInt
-
-object Main extends IOApp.Simple {
+object Main extends IOApp {
   
   private val httpClient = JavaNetClientBuilder[IO].create
   private val getStars = Stream.eval(
-    httpClient.expect[String]("https://ip.dockovpn.io")
-      .flatMap(IO.println)
+    for {
+      json <- httpClient.expect[Json]("https://api.github.com/repos/dockovpn/dockovpn")
+      starsCount <- IO(json.asObject.get.apply("watchers_count").get)
+      _ <- IO.println(starsCount)
+    } yield starsCount
   )
   
-  override def run: IO[Unit] = {
+  override def run(args: List[String]): IO[ExitCode] = {
     val cronScheduler = Cron4sScheduler.systemDefault[IO]
     val evenSeconds = Cron.unsafeParse("*/2 * * ? * *")
     val scheduled = cronScheduler.awakeEvery(evenSeconds) >> getStars
-    val cancel = SignallingRef[IO, Boolean](false)
     
     for {
-      c <- cancel
-      s <- scheduled.interruptWhen(c).repeat.compile.drain.start
-      //prints about 5 times before stop
-      _ <- Temporal[IO].sleep(10.seconds) >> c.set(true)
-    } yield s
+      _ <- scheduled.repeat.compile.drain.start
+      _ <- Temporal[IO].never >> IO.pure(())
+    } yield ExitCode.Success
   }
 }
