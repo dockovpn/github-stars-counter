@@ -31,8 +31,8 @@ object Main extends IOApp {
   
   override def run(args: List[String]): IO[ExitCode] = {
     val cronScheduler = Cron4sScheduler.systemDefault[IO]
-    val evenSeconds = Cron.unsafeParse("0 * * ? * *")
-    val scheduled = cronScheduler.awakeEvery(evenSeconds) >> getStars
+    val everyHour = Cron.unsafeParse("0 * * ? * *")
+    val scheduled = cronScheduler.awakeEvery(everyHour) >> getStars
     
     for {
       _ <- scheduled.repeat.compile.drain.start
