@@ -1,9 +1,10 @@
-import cats.effect.{IO, IOApp}
+package io.dockovpn.githubstars
+
+import cats.effect.{IO, IOApp, Temporal}
 import cron4s.Cron
 import eu.timepit.fs2cron.cron4s.Cron4sScheduler
-import fs2.Stream
 import fs2.concurrent.SignallingRef
-import cats.effect._
+import fs2.Stream
 
 import java.time.LocalTime
 import scala.concurrent.duration.DurationInt
@@ -17,7 +18,7 @@ object Main extends IOApp.Simple {
     val evenSeconds = Cron.unsafeParse("*/2 * * ? * *")
     val scheduled = cronScheduler.awakeEvery(evenSeconds) >> printTime
     val cancel = SignallingRef[IO, Boolean](false)
-  
+    
     for {
       c <- cancel
       s <- scheduled.interruptWhen(c).repeat.compile.drain.start
