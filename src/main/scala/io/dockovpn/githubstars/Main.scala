@@ -14,7 +14,8 @@ import io.dockovpn.metastore.provider.StoreProvider
 import io.dockovpn.metastore.store.AbstractStore
 import io.dockovpn.metastore.util.Lazy.lazily
 import org.http4s.circe.CirceEntityDecoder._
-import org.http4s.client.JavaNetClientBuilder
+import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import slick.jdbc.MySQLProfile.api._
 
 import scala.concurrent.ExecutionContext.Implicits._
@@ -27,24 +28,28 @@ object Main extends IOApp {
   
   private val store: AbstractStore[StarsCount] = StoreProvider.getStoreByType(appConfig.githubStarsCounterConfig.storeType)
   private val service = new GithubStarsService(store)
-  private val httpClient = JavaNetClientBuilder[IO].create
-  private val getStars = Stream.eval(
+  private val httpClientResource = EmberClientBuilder.default[IO].build
+  
+  private def getStars(httpClient: Client[IO]): Stream[IO, Int] = Stream.eval(
     for {
       json <- httpClient.expect[Json]("https://api.github.com/repos/dockovpn/dockovpn")
-      starsCount <- IO(json.asObject.get.apply("watchers_count").get.as[Int].toOption.get)
+      starsCount = json.asObject.get.apply("watchers_count").get.as[Int].toOption.get
       _ <- IO.println(starsCount)
       _ <- service.addRecord(starsCount)
-    } yield starsCount
-  )
+    } yield starsCount)
   
   override def run(args: List[String]): IO[ExitCode] = {
     val cronScheduler = Cron4sScheduler.systemDefault[IO]
-    val everyHour = Cron.unsafeParse("0 0 * ? * *")
-    val scheduled = cronScheduler.awakeEvery(everyHour) >> getStars
+    val timeInterval = Cron.unsafeParse(appConfig.githubStarsCounterConfig.cron)
     
     for {
+      httpClientAllocated <- httpClientResource.allocated
+      (httpClient, releaseHttpClient) = httpClientAllocated
+      effect = getStars(httpClient)
+      scheduled = cronScheduler.awakeEvery(timeInterval) >> effect
       _ <- scheduled.repeat.compile.drain.start
       _ <- Temporal[IO].never >> IO.pure(())
+      _ <- releaseHttpClient >> IO.println("Releasing HTTP client")
     } yield ExitCode.Success
   }
 }

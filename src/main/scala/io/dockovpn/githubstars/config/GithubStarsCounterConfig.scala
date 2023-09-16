@@ -6,5 +6,6 @@ package io.dockovpn.githubstars.config
 
 case class GithubStarsCounterConfig(
   storeType: String,
-  repos: String
+  repos: String,
+  cron: String,
 )
