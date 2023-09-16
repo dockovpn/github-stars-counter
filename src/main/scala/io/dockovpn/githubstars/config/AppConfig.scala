@@ -17,7 +17,6 @@ object AppConfig {
     val confName = s"application-$env.conf"
     val source = default(ConfigSource.resources(confName))
     
-    // FixMe: looks bit ugly
     val slickConfig: Config = source.config().map { v =>
       ConfigSource.fromConfig(v.getConfig("slick")).config()
     }.toOption.get.toOption.get

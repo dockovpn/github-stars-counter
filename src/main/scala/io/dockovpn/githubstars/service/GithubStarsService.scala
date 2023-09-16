@@ -10,10 +10,10 @@ import java.util.UUID
 
 class GithubStarsService(store: AbstractStore[StarsCount]) {
   
-  def addRecord(starsCount: Int): IO[Unit] = for {
+  def addRecord(repoName: String, starsCount: Int): IO[Unit] = for {
     record <- IO(StarsCount(
       recordId = UUID.randomUUID().toString,
-      repoName = "dockovpn/dockovpn",
+      repoName = repoName,
       stars = starsCount,
       timeCreated = Timestamp.from(Instant.now()),
     ))

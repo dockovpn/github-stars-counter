@@ -22,25 +22,31 @@ import scala.concurrent.ExecutionContext.Implicits._
 
 object Main extends IOApp {
   private val appConfig = AppConfig()
+  private val starsCounterConfig = appConfig.githubStarsCounterConfig
   
   private implicit val metadataProvider: TableMetadataProvider = new TableMetadataProvider()
   private implicit val dbRef: DBRef = lazily { Database.forConfig("", appConfig.slickConfig) }
   
-  private val store: AbstractStore[StarsCount] = StoreProvider.getStoreByType(appConfig.githubStarsCounterConfig.storeType)
+  private val store: AbstractStore[StarsCount] = StoreProvider.getStoreByType(starsCounterConfig.storeType)
   private val service = new GithubStarsService(store)
   private val httpClientResource = EmberClientBuilder.default[IO].build
   
-  private def getStars(httpClient: Client[IO]): Stream[IO, Int] = Stream.eval(
-    for {
-      json <- httpClient.expect[Json]("https://api.github.com/repos/dockovpn/dockovpn")
-      starsCount = json.asObject.get.apply("watchers_count").get.as[Int].toOption.get
-      _ <- IO.println(starsCount)
-      _ <- service.addRecord(starsCount)
-    } yield starsCount)
+  private def getStars(httpClient: Client[IO]): Stream[IO, Int] =
+    Stream.emits(starsCounterConfig.repos.split(","))
+      .flatMap { repo =>
+        Stream.eval(
+          for {
+            json <- httpClient.expect[Json](s"https://api.github.com/repos/$repo")
+            starsCount = json.asObject.get("watchers_count").get.as[Int].toOption.get
+            _ <- IO.println(s"Repo: $repo; stars: $starsCount")
+            _ <- service.addRecord(repo, starsCount)
+          } yield starsCount
+        )
+      }
   
   override def run(args: List[String]): IO[ExitCode] = {
     val cronScheduler = Cron4sScheduler.systemDefault[IO]
-    val timeInterval = Cron.unsafeParse(appConfig.githubStarsCounterConfig.cron)
+    val timeInterval = Cron.unsafeParse(starsCounterConfig.cron)
     
     for {
       httpClientAllocated <- httpClientResource.allocated
