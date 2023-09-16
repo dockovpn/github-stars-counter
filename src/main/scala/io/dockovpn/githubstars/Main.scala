@@ -45,7 +45,9 @@ object Main extends IOApp {
     for {
       httpClientAllocated <- httpClientResource.allocated
       (httpClient, releaseHttpClient) = httpClientAllocated
-      effect = getStars(httpClient)
+      effect = getStars(httpClient).handleErrorWith { t =>
+        Stream.eval(IO.println(t.getMessage))
+      }
       scheduled = cronScheduler.awakeEvery(timeInterval) >> effect
       _ <- scheduled.repeat.compile.drain.start
       _ <- Temporal[IO].never >> IO.pure(())
