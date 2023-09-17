@@ -32,7 +32,7 @@ object Main extends IOApp {
   private val httpClientResource = EmberClientBuilder.default[IO].build
   
   private def getStars(httpClient: Client[IO]): Stream[IO, Int] =
-    Stream.emits(starsCounterConfig.repos.split(","))
+    Stream.emits(starsCounterConfig.repos.split(",").map(_.trim))
       .flatMap { repo =>
         Stream.eval(
           for {

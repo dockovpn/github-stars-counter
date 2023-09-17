@@ -11,7 +11,7 @@ import java.util.UUID
 class GithubStarsService(store: AbstractStore[StarsCount]) {
   
   def addRecord(repoName: String, starsCount: Int): IO[Unit] = for {
-    record <- IO(StarsCount(
+    record <- IO.pure(StarsCount(
       recordId = UUID.randomUUID().toString,
       repoName = repoName,
       stars = starsCount,
