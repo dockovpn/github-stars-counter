@@ -1,6 +1,6 @@
 package io.dockovpn.githubstars
 
-import cats.effect.{ExitCode, IO, IOApp, Temporal}
+import cats.effect.{ExitCode, IO, IOApp}
 import cron4s.Cron
 import eu.timepit.fs2cron.cron4s.Cron4sScheduler
 import fs2.Stream
@@ -56,7 +56,7 @@ object Main extends IOApp {
       }
       scheduled = cronScheduler.awakeEvery(timeInterval) >> effect
       _ <- scheduled.repeat.compile.drain.start
-      _ <- Temporal[IO].never >> IO.pure(())
+      _ <- IO.never.void
       _ <- releaseHttpClient >> IO.println("Releasing HTTP client")
     } yield ExitCode.Success
   }
